@@ -1,0 +1,608 @@
+#!/usr/bin/env python3
+"""
+Crosshair Configuration Utility
+System-integrated settings editor for the Wayland crosshair daemon.
+"""
+
+import sys
+import os
+import subprocess
+from pathlib import Path
+
+from PyQt6.QtWidgets import (
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QPushButton, QSlider, QFrame, QColorDialog, QTabWidget,
+    QFormLayout, QComboBox, QDoubleSpinBox, QSpinBox, QCheckBox,
+    QLineEdit, QDialogButtonBox, QDialog
+)
+from PyQt6.QtGui import (
+    QPainter, QColor, QPen, QBrush, QIcon, QPainterPath
+)
+from PyQt6.QtCore import Qt, QRectF, QPointF, QTimer
+
+CONFIG_DIR = Path.home() / ".config" / "crosshair"
+CONFIG_FILE = CONFIG_DIR / "config"
+
+DEFAULT_CONFIG = {
+    "shape": "dot",
+    "size": 6.0,
+    "color": "#00FF00",
+    "outline": 1.0,
+    "outline_color": "#000000",
+    "opacity": 1.0,
+    "offset_x": 0,
+    "offset_y": 0,
+    "gap": 3,
+    "length": 7,
+    "thickness": 2,
+    "monitor": "all",
+}
+
+PRESETS = {
+    "Default Dot": {"shape": "dot", "size": 6.0, "color": "#00FF00", "outline": 1.0, "offset_x": 0, "offset_y": 0},
+    "Micro Dot": {"shape": "dot", "size": 3.0, "color": "#00FF00", "outline": 0.8, "offset_x": 0, "offset_y": 0},
+    "Hollow Ring": {"shape": "ring", "size": 8.0, "color": "#00FF00", "outline": 1.0, "thickness": 2, "offset_x": 0, "offset_y": 0},
+    "Dot + Ring": {"shape": "dot-ring", "size": 10.0, "color": "#00FF00", "outline": 1.0, "thickness": 1, "offset_x": 0, "offset_y": 0},
+    "Classic Cross": {"shape": "cross", "size": 12.0, "color": "#00FF00", "outline": 1.0, "gap": 3, "length": 6, "thickness": 2, "offset_x": 0, "offset_y": 0},
+    "Cross + Dot": {"shape": "cross-dot", "size": 14.0, "color": "#00FF00", "outline": 1.0, "gap": 4, "length": 7, "thickness": 2, "offset_x": 0, "offset_y": 0},
+}
+
+
+def load_config():
+    cfg = dict(DEFAULT_CONFIG)
+    if not CONFIG_FILE.exists():
+        return cfg
+    try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith(("#", ";")):
+                    continue
+                if "=" in line:
+                    k, v = [part.strip() for part in line.split("=", 1)]
+                    k = k.lower()
+                    if k in ("size", "outline", "opacity"):
+                        cfg[k] = float(v)
+                    elif k in ("offset_x", "offset_y", "gap", "length", "thickness"):
+                        cfg[k] = int(v)
+                    elif k in ("shape", "color", "outline_color", "monitor"):
+                        cfg[k] = v
+    except Exception as err:
+        print(f"Error reading config: {err}", file=sys.stderr)
+    return cfg
+
+
+def save_config(cfg):
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# Crosshair Overlay Configuration",
+        f"shape = {cfg.get('shape', 'dot')}",
+        f"size = {cfg.get('size', 6.0):.1f}",
+        f"color = {cfg.get('color', '#00FF00')}",
+        f"outline = {cfg.get('outline', 1.0):.1f}",
+        f"outline_color = {cfg.get('outline_color', '#000000')}",
+        f"opacity = {cfg.get('opacity', 1.0):.2f}",
+        f"offset_x = {int(cfg.get('offset_x', 0))}",
+        f"offset_y = {int(cfg.get('offset_y', 0))}",
+        f"gap = {int(cfg.get('gap', 3))}",
+        f"length = {int(cfg.get('length', 7))}",
+        f"thickness = {int(cfg.get('thickness', 2))}",
+        f"monitor = {cfg.get('monitor', 'all')}",
+    ]
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+    subprocess.run(["crosshair", "reload"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def get_process_status():
+    proc = subprocess.run(["crosshair", "status"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    if proc.returncode == 0 and "PID" in proc.stdout:
+        pid = proc.stdout.split("PID")[-1].replace(")", "").strip()
+        return True, pid
+    return False, None
+
+
+class PreviewWidget(QFrame):
+    """Accurate 1:1 pixel preview rendered on standard application surfaces."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(160, 160)
+        self.setFrameShape(QFrame.Shape.StyledPanel)
+        self.setFrameShadow(QFrame.Shadow.Sunken)
+        self.bg_mode = "dark"
+        self.cfg = dict(DEFAULT_CONFIG)
+
+    def set_config(self, cfg):
+        self.cfg = dict(cfg)
+        self.update()
+
+    def set_bg_mode(self, mode):
+        self.bg_mode = mode
+        self.update()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        rect = self.contentsRect()
+        cx = rect.center().x()
+        cy = rect.center().y()
+
+        if self.bg_mode == "dark":
+            painter.fillRect(rect, QColor(24, 25, 29))
+        elif self.bg_mode == "light":
+            painter.fillRect(rect, QColor(220, 224, 230))
+        elif self.bg_mode == "checker":
+            cell = 10
+            for y in range(rect.top(), rect.bottom(), cell):
+                for x in range(rect.left(), rect.right(), cell):
+                    is_even = ((x // cell) + (y // cell)) % 2 == 0
+                    painter.fillRect(x, y, cell, cell, QColor(36, 38, 44) if is_even else QColor(24, 25, 29))
+
+        # Thin grid crosshair alignment lines
+        pen = QPen(QColor(128, 128, 128, 40), 1, Qt.PenStyle.DotLine)
+        painter.setPen(pen)
+        painter.drawLine(rect.left(), int(cy), rect.right(), int(cy))
+        painter.drawLine(int(cx), rect.top(), int(cx), rect.bottom())
+
+        shape = self.cfg.get("shape", "dot")
+        size = float(self.cfg.get("size", 6.0))
+        outline = float(self.cfg.get("outline", 1.0))
+        opacity = float(self.cfg.get("opacity", 1.0))
+        gap = int(self.cfg.get("gap", 3))
+        length = int(self.cfg.get("length", 7))
+        thickness = int(self.cfg.get("thickness", 2))
+
+        col = QColor(self.cfg.get("color", "#00FF00"))
+        col.setAlphaF(min(1.0, max(0.0, opacity)))
+
+        out_col = QColor(self.cfg.get("outline_color", "#000000"))
+        out_col.setAlphaF(min(1.0, max(0.0, 0.85 * opacity)))
+
+        if shape == "dot":
+            radius = size / 2.0
+            if outline > 0:
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QBrush(out_col))
+                painter.drawEllipse(QPointF(cx, cy), radius + outline, radius + outline)
+            painter.setBrush(QBrush(col))
+            painter.drawEllipse(QPointF(cx, cy), radius, radius)
+
+        elif shape == "ring":
+            radius = size / 2.0
+            th = thickness if thickness else 1.5
+            if outline > 0:
+                painter.setPen(QPen(out_col, th + outline * 2.0))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawEllipse(QPointF(cx, cy), radius, radius)
+            painter.setPen(QPen(col, th))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(QPointF(cx, cy), radius, radius)
+
+        elif shape == "dot-ring":
+            radius = size / 2.0
+            th = thickness if thickness else 1.5
+            if outline > 0:
+                painter.setPen(QPen(out_col, th + outline * 2.0))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawEllipse(QPointF(cx, cy), radius, radius)
+            painter.setPen(QPen(col, th))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(QPointF(cx, cy), radius, radius)
+
+            dot_r = 1.5
+            if outline > 0:
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QBrush(out_col))
+                painter.drawEllipse(QPointF(cx, cy), dot_r + outline, dot_r + outline)
+            painter.setBrush(QBrush(col))
+            painter.drawEllipse(QPointF(cx, cy), dot_r, dot_r)
+
+        elif shape in ("cross", "cross-dot"):
+            bars = [
+                (cx - gap - length, cy - thickness / 2.0, length, thickness),
+                (cx + gap, cy - thickness / 2.0, length, thickness),
+                (cx - thickness / 2.0, cy - gap - length, thickness, length),
+                (cx - thickness / 2.0, cy + gap, thickness, length),
+            ]
+            if outline > 0:
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QBrush(out_col))
+                for bx, by, bw, bh in bars:
+                    painter.drawRect(QRectF(bx - outline, by - outline, bw + outline * 2.0, bh + outline * 2.0))
+
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(col))
+            for bx, by, bw, bh in bars:
+                painter.drawRect(QRectF(bx, by, bw, bh))
+
+            if shape == "cross-dot":
+                dot_r = (thickness / 2.0) if thickness > 2 else 1.5
+                if outline > 0:
+                    painter.setPen(Qt.PenStyle.NoPen)
+                    painter.setBrush(QBrush(out_col))
+                    painter.drawEllipse(QPointF(cx, cy), dot_r + outline, dot_r + outline)
+                painter.setBrush(QBrush(col))
+                painter.drawEllipse(QPointF(cx, cy), dot_r, dot_r)
+
+
+class CrosshairSettingsDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Crosshair Settings")
+        self.setMinimumWidth(440)
+
+        icon_candidates = [
+            Path.home() / ".local/share/icons/hicolor/scalable/apps/crosshair.svg",
+            Path("/usr/share/icons/hicolor/scalable/apps/crosshair.svg"),
+            Path(__file__).resolve().parent / "data/crosshair.svg",
+        ]
+        for p in icon_candidates:
+            if p.exists():
+                self.setWindowIcon(QIcon(str(p)))
+                break
+
+        self.cfg = load_config()
+        self.updating_ui = False
+
+        self.init_ui()
+
+        self.status_timer = QTimer(self)
+        self.status_timer.timeout.connect(self.update_status)
+        self.status_timer.start(1000)
+        self.update_status()
+
+    def init_ui(self):
+        root = QVBoxLayout(self)
+        root.setContentsMargins(12, 12, 12, 12)
+        root.setSpacing(10)
+
+        # -------------------------------------------------------------
+        # Status Bar Header
+        # -------------------------------------------------------------
+        status_bar = QHBoxLayout()
+        self.lbl_status = QLabel("Checking daemon status...")
+        self.btn_toggle = QPushButton("Enable")
+        self.btn_toggle.clicked.connect(self.on_toggle_clicked)
+        status_bar.addWidget(self.lbl_status)
+        status_bar.addStretch()
+        status_bar.addWidget(self.btn_toggle)
+        root.addLayout(status_bar)
+
+        # -------------------------------------------------------------
+        # Preview Box
+        # -------------------------------------------------------------
+        preview_container = QHBoxLayout()
+        self.canvas = PreviewWidget()
+        self.canvas.set_config(self.cfg)
+
+        bg_box = QVBoxLayout()
+        bg_box.addStretch()
+        bg_label = QLabel("Preview Background:")
+        self.combo_bg = QComboBox()
+        self.combo_bg.addItems(["Dark", "Light", "Checkerboard"])
+        self.combo_bg.currentIndexChanged.connect(self.on_bg_changed)
+        bg_box.addWidget(bg_label)
+        bg_box.addWidget(self.combo_bg)
+        bg_box.addStretch()
+
+        preview_container.addWidget(self.canvas)
+        preview_container.addSpacing(12)
+        preview_container.addLayout(bg_box)
+        preview_container.addStretch()
+        root.addLayout(preview_container)
+
+        # -------------------------------------------------------------
+        # Configuration Tabs
+        # -------------------------------------------------------------
+        tabs = QTabWidget()
+
+        # --- Tab 1: Appearance ---
+        tab_app = QWidget()
+        form_app = QFormLayout(tab_app)
+        form_app.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        form_app.setContentsMargins(10, 10, 10, 10)
+        form_app.setSpacing(8)
+
+        # Preset
+        self.combo_preset = QComboBox()
+        self.combo_preset.addItem("Custom")
+        for name in PRESETS.keys():
+            self.combo_preset.addItem(name)
+        self.combo_preset.currentTextChanged.connect(self.on_preset_selected)
+        form_app.addRow("Preset:", self.combo_preset)
+
+        # Reticle Shape
+        self.combo_shape = QComboBox()
+        self.combo_shape.addItem("Dot", "dot")
+        self.combo_shape.addItem("Hollow Ring", "ring")
+        self.combo_shape.addItem("Dot + Ring", "dot-ring")
+        self.combo_shape.addItem("Cross", "cross")
+        self.combo_shape.addItem("Cross + Dot", "cross-dot")
+        self.combo_shape.currentIndexChanged.connect(self.on_shape_changed)
+        form_app.addRow("Shape:", self.combo_shape)
+
+        # Size
+        size_box = QHBoxLayout()
+        self.slider_size = QSlider(Qt.Orientation.Horizontal)
+        self.slider_size.setRange(2, 60)
+        self.spin_size = QDoubleSpinBox()
+        self.spin_size.setRange(1.0, 30.0)
+        self.spin_size.setSingleStep(0.5)
+        self.spin_size.setSuffix(" px")
+        self.slider_size.valueChanged.connect(self.on_slider_size)
+        self.spin_size.valueChanged.connect(self.on_spin_size)
+        size_box.addWidget(self.slider_size)
+        size_box.addWidget(self.spin_size)
+        form_app.addRow("Size:", size_box)
+
+        # Color
+        color_box = QHBoxLayout()
+        self.btn_color_picker = QPushButton("Pick Color...")
+        self.btn_color_picker.clicked.connect(self.choose_color)
+        self.lbl_color_preview = QLabel("   ")
+        self.lbl_color_preview.setFixedSize(28, 22)
+        self.lbl_color_hex = QLabel("#00FF00")
+        color_box.addWidget(self.lbl_color_preview)
+        color_box.addWidget(self.lbl_color_hex)
+        color_box.addWidget(self.btn_color_picker)
+        color_box.addStretch()
+        form_app.addRow("Color:", color_box)
+
+        # Outline
+        outline_box = QHBoxLayout()
+        self.slider_outline = QSlider(Qt.Orientation.Horizontal)
+        self.slider_outline.setRange(0, 30)
+        self.spin_outline = QDoubleSpinBox()
+        self.spin_outline.setRange(0.0, 3.0)
+        self.spin_outline.setSingleStep(0.5)
+        self.spin_outline.setSuffix(" px")
+        self.slider_outline.valueChanged.connect(self.on_slider_outline)
+        self.spin_outline.valueChanged.connect(self.on_spin_outline)
+        outline_box.addWidget(self.slider_outline)
+        outline_box.addWidget(self.spin_outline)
+        form_app.addRow("Outline:", outline_box)
+
+        # Opacity
+        opacity_box = QHBoxLayout()
+        self.slider_opacity = QSlider(Qt.Orientation.Horizontal)
+        self.slider_opacity.setRange(20, 100)
+        self.spin_opacity = QSpinBox()
+        self.spin_opacity.setRange(20, 100)
+        self.spin_opacity.setSuffix("%")
+        self.slider_opacity.valueChanged.connect(self.on_slider_opacity)
+        self.spin_opacity.valueChanged.connect(self.on_spin_opacity)
+        opacity_box.addWidget(self.slider_opacity)
+        opacity_box.addWidget(self.spin_opacity)
+        form_app.addRow("Opacity:", opacity_box)
+
+        tabs.addTab(tab_app, "Appearance")
+
+        # --- Tab 2: Position ---
+        tab_pos = QWidget()
+        form_pos = QFormLayout(tab_pos)
+        form_pos.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+        form_pos.setContentsMargins(10, 10, 10, 10)
+        form_pos.setSpacing(8)
+
+        self.spin_off_x = QSpinBox()
+        self.spin_off_x.setRange(-50, 50)
+        self.spin_off_x.setSuffix(" px")
+        self.spin_off_x.valueChanged.connect(self.on_offset_changed)
+        form_pos.addRow("Horizontal Offset (X):", self.spin_off_x)
+
+        self.spin_off_y = QSpinBox()
+        self.spin_off_y.setRange(-50, 50)
+        self.spin_off_y.setSuffix(" px")
+        self.spin_off_y.valueChanged.connect(self.on_offset_changed)
+        form_pos.addRow("Vertical Offset (Y):", self.spin_off_y)
+
+        btn_center = QPushButton("Reset to Center (0, 0)")
+        btn_center.clicked.connect(self.reset_offsets)
+        form_pos.addRow("", btn_center)
+
+        tabs.addTab(tab_pos, "Position")
+
+        # --- Tab 3: Integration (CS2) ---
+        tab_game = QWidget()
+        layout_game = QVBoxLayout(tab_game)
+        layout_game.setContentsMargins(10, 10, 10, 10)
+        layout_game.setSpacing(8)
+
+        layout_game.addWidget(QLabel("Disable Counter-Strike 2 in-game crosshair:"))
+        cs2_box = QHBoxLayout()
+        self.edit_cs2_cmd = QLineEdit("cl_crosshairalpha 0; cl_crosshair_drawoutline 0")
+        self.edit_cs2_cmd.setReadOnly(True)
+        btn_copy = QPushButton("Copy")
+        btn_copy.clicked.connect(lambda: self.copy_text(self.edit_cs2_cmd.text(), btn_copy))
+        cs2_box.addWidget(self.edit_cs2_cmd)
+        cs2_box.addWidget(btn_copy)
+        layout_game.addLayout(cs2_box)
+
+        layout_game.addWidget(QLabel("Restore Counter-Strike 2 in-game crosshair:"))
+        cs2_restore_box = QHBoxLayout()
+        self.edit_cs2_restore = QLineEdit("cl_crosshairalpha 255; cl_crosshair_drawoutline 1")
+        self.edit_cs2_restore.setReadOnly(True)
+        btn_restore_copy = QPushButton("Copy")
+        btn_restore_copy.clicked.connect(lambda: self.copy_text(self.edit_cs2_restore.text(), btn_restore_copy))
+        cs2_restore_box.addWidget(self.edit_cs2_restore)
+        cs2_restore_box.addWidget(btn_restore_copy)
+        layout_game.addLayout(cs2_restore_box)
+
+        layout_game.addStretch()
+        tabs.addTab(tab_game, "Game Integration")
+
+        root.addWidget(tabs)
+
+        # -------------------------------------------------------------
+        # Dialog Button Box
+        # -------------------------------------------------------------
+        btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        btn_box.rejected.connect(self.close)
+        root.addWidget(btn_box)
+
+        self.sync_widgets_from_config()
+
+    def sync_widgets_from_config(self):
+        self.updating_ui = True
+
+        shape = self.cfg.get("shape", "dot")
+        idx = self.combo_shape.findData(shape)
+        if idx >= 0:
+            self.combo_shape.setCurrentIndex(idx)
+
+        sz = float(self.cfg.get("size", 6.0))
+        self.spin_size.setValue(sz)
+        self.slider_size.setValue(int(sz * 2))
+
+        ot = float(self.cfg.get("outline", 1.0))
+        self.spin_outline.setValue(ot)
+        self.slider_outline.setValue(int(ot * 10))
+
+        op = float(self.cfg.get("opacity", 1.0))
+        self.spin_opacity.setValue(int(op * 100))
+        self.slider_opacity.setValue(int(op * 100))
+
+        self.spin_off_x.setValue(int(self.cfg.get("offset_x", 0)))
+        self.spin_off_y.setValue(int(self.cfg.get("offset_y", 0)))
+
+        self.update_color_preview()
+        self.canvas.set_config(self.cfg)
+        self.updating_ui = False
+
+    def update_color_preview(self):
+        col = self.cfg.get("color", "#00FF00").upper()
+        self.lbl_color_hex.setText(col)
+        self.lbl_color_preview.setStyleSheet(f"background-color: {col}; border: 1px solid #555; border-radius: 3px;")
+
+    def on_bg_changed(self, idx):
+        modes = ["dark", "light", "checker"]
+        self.canvas.set_bg_mode(modes[idx])
+
+    def on_preset_selected(self, name):
+        if self.updating_ui or name not in PRESETS:
+            return
+        self.cfg.update(PRESETS[name])
+        self.sync_widgets_from_config()
+        self.commit()
+
+    def on_shape_changed(self, idx):
+        if self.updating_ui: return
+        self.cfg["shape"] = self.combo_shape.currentData()
+        self.combo_preset.setCurrentText("Custom")
+        self.commit()
+
+    def on_slider_size(self, val):
+        if self.updating_ui: return
+        self.updating_ui = True
+        sz = val / 2.0
+        self.spin_size.setValue(sz)
+        self.cfg["size"] = sz
+        self.combo_preset.setCurrentText("Custom")
+        self.updating_ui = False
+        self.commit()
+
+    def on_spin_size(self, val):
+        if self.updating_ui: return
+        self.updating_ui = True
+        self.slider_size.setValue(int(val * 2))
+        self.cfg["size"] = val
+        self.combo_preset.setCurrentText("Custom")
+        self.updating_ui = False
+        self.commit()
+
+    def on_slider_outline(self, val):
+        if self.updating_ui: return
+        self.updating_ui = True
+        ot = val / 10.0
+        self.spin_outline.setValue(ot)
+        self.cfg["outline"] = ot
+        self.combo_preset.setCurrentText("Custom")
+        self.updating_ui = False
+        self.commit()
+
+    def on_spin_outline(self, val):
+        if self.updating_ui: return
+        self.updating_ui = True
+        self.slider_outline.setValue(int(val * 10))
+        self.cfg["outline"] = val
+        self.combo_preset.setCurrentText("Custom")
+        self.updating_ui = False
+        self.commit()
+
+    def on_slider_opacity(self, val):
+        if self.updating_ui: return
+        self.updating_ui = True
+        self.spin_opacity.setValue(val)
+        self.cfg["opacity"] = val / 100.0
+        self.updating_ui = False
+        self.commit()
+
+    def on_spin_opacity(self, val):
+        if self.updating_ui: return
+        self.updating_ui = True
+        self.slider_opacity.setValue(val)
+        self.cfg["opacity"] = val / 100.0
+        self.updating_ui = False
+        self.commit()
+
+    def on_offset_changed(self):
+        if self.updating_ui: return
+        self.cfg["offset_x"] = self.spin_off_x.value()
+        self.cfg["offset_y"] = self.spin_off_y.value()
+        self.commit()
+
+    def reset_offsets(self):
+        self.updating_ui = True
+        self.spin_off_x.setValue(0)
+        self.spin_off_y.setValue(0)
+        self.cfg["offset_x"] = 0
+        self.cfg["offset_y"] = 0
+        self.updating_ui = False
+        self.commit()
+
+    def choose_color(self):
+        cur = QColor(self.cfg.get("color", "#00FF00"))
+        col = QColorDialog.getColor(cur, self, "Select Reticle Color")
+        if col.isValid():
+            self.cfg["color"] = col.name().upper()
+            self.update_color_preview()
+            self.combo_preset.setCurrentText("Custom")
+            self.commit()
+
+    def commit(self):
+        self.canvas.set_config(self.cfg)
+        save_config(self.cfg)
+
+    def update_status(self):
+        is_running, pid = get_process_status()
+        if is_running:
+            self.lbl_status.setText(f"Daemon Status: <b>Running</b> (PID {pid})")
+            self.btn_toggle.setText("Stop Daemon")
+        else:
+            self.lbl_status.setText("Daemon Status: <b>Stopped</b>")
+            self.btn_toggle.setText("Start Daemon")
+
+    def on_toggle_clicked(self):
+        subprocess.run(["crosshair", "toggle"])
+        QTimer.singleShot(250, self.update_status)
+
+    def copy_text(self, text, button):
+        QApplication.clipboard().setText(text)
+        orig = button.text()
+        button.setText("Copied")
+        QTimer.singleShot(1200, lambda: button.setText(orig))
+
+
+def main():
+    app = QApplication(sys.argv)
+    app.setDesktopFileName("crosshair")
+    win = CrosshairSettingsDialog()
+    win.show()
+    sys.exit(app.exec())
+
+
+if __name__ == "__main__":
+    main()

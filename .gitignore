@@ -1,0 +1,13 @@
+# Binaries & build artifacts
+crosshair
+src/crosshair
+*.o
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+
+# Editor & OS files
+.DS_Store
+*.swp
+*~
