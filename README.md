@@ -1,23 +1,13 @@
 # crosshair-overlay
+ 
+Screen crosshair overlay daemon for Wayland compositors (Hyprland, Sway, River) written in C using `gtk-layer-shell` and Cairo, paired with a native Qt configuration utility.
+ 
+## Overview
 
-A lightweight, zero-latency screen crosshair overlay daemon and configuration utility for Wayland compositors (Hyprland, Sway, Wayfire, River).
+Unlike X11 overlays or utilities running through XWayland, `crosshair-overlay` binds directly to the Wayland `overlay` layer surface with input passthrough enabled. Cursor clicks, keyboard events, and mouse motion pass straight through to running applications without interception or input latency.
 
-Built in C using `gtk-layer-shell` and Cairo, paired with a native Qt configuration dialog.
+Reticle geometry (dot, hollow circle, classic crosshair, subpixel thickness, gap, offsets) is rendered using Cairo with anti-aliasing. The daemon monitors for `SIGUSR1` signals so configuration updates reload immediately without restarting the process.
 
----
-
-## Features
-
-- **True Wayland Layer Surface**: Uses the Wayland `layer-shell` protocol to render an input-transparent, click-through overlay on the `overlay` layer.
-- **Zero Input Interference**: Input passthrough enabled by default; never intercepts mouse clicks, keyboard input, or cursor movement.
-- **Instant Hot-Reload**: Supports live reload without restarting the process via `SIGUSR1` or the CLI (`crosshair reload`).
-- **Reticle Geometries**: Dot, hollow ring, dot + ring, classic cross, and cross + center dot.
-- **Subpixel & Offset Control**: Fine-grained adjustments for size, line thickness, center gap, line length, outline stroke, outline color, opacity, and X/Y pixel offsets.
-- **Multi-Monitor Support**: Target all connected monitors simultaneously or bind to a specific display.
-- **Native Qt Settings GUI**: Clean, system-themed configuration utility (`crosshair-gui`) built with standard Qt widgets matching Breeze/KDE/system palettes without hardcoded CSS.
-- **Desktop & Launcher Integration**: Ships with an XDG `.desktop` entry, actions (`Toggle`, `Start`, `Stop`), and an SVG scalable icon.
-
----
 
 ## Requirements
 
