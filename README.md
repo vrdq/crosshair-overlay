@@ -1,106 +1,85 @@
 # crosshair-overlay
- 
-Screen crosshair overlay daemon for Wayland compositors (Hyprland, Sway, River) written in C using `gtk-layer-shell` and Cairo, paired with a native Qt configuration utility.
- 
-## Overview
 
-Unlike X11 overlays or utilities running through XWayland, `crosshair-overlay` binds directly to the Wayland `overlay` layer surface with input passthrough enabled. Cursor clicks, keyboard events, and mouse motion pass straight through to running applications without interception or input latency.
+Screen crosshair overlay daemon for Wayland compositors (Hyprland, Sway, River) written in C using `gtk-layer-shell` and Cairo, with a native Qt settings utility (`crosshair-gui`).
 
-Reticle geometry (dot, hollow circle, classic crosshair, subpixel thickness, gap, offsets) is rendered using Cairo with anti-aliasing. The daemon monitors for `SIGUSR1` signals so configuration updates reload immediately without restarting the process.
+## How It Works
 
+Unlike X11 overlays or utilities running through XWayland, `crosshair-overlay` binds directly to the Wayland `overlay` layer surface with input passthrough enabled. Clicks and mouse motion pass straight through to the underlying game without added latency.
 
-## Requirements
-
-### Build Dependencies
-
-- C compiler (`gcc` or `clang`)
-- `make`
-- `pkg-config`
-- `gtk3`
-- `gtk-layer-shell`
-- `cairo`
-- `glib2`
-
-### GUI Requirements
-
-- Python 3
-- `python-pyqt6` (Arch: `sudo pacman -S python-pyqt6`)
-
-### On Arch Linux:
-
-```bash
-sudo pacman -S base-devel gtk3 gtk-layer-shell cairo glib2 python-pyqt6
-```
-
----
+Reticles (dot, hollow ring, dot-ring, cross, and cross-dot) are drawn using Cairo with anti-aliasing. The daemon listens for `SIGUSR1` and `SIGHUP` signals, reloading configuration from disk without restarting the process.
 
 ## Installation
 
-Clone the repository and build:
+### Dependencies
+
+On Arch Linux / CachyOS / Manjaro:
+```bash
+sudo pacman -S base-devel gtk3 gtk-layer-shell cairo glib2 python python-pyqt6
+```
+
+On Debian / Ubuntu / Linux Mint:
+```bash
+sudo apt-get update && sudo apt-get install -y build-essential libgtk-3-dev libgtk-layer-shell-dev libcairo2-dev libglib2.0-dev pkg-config python3 python3-pyqt6
+```
+
+On Fedora:
+```bash
+sudo dnf install -y gcc make pkgconf-pkg-config gtk3-devel gtk-layer-shell-devel cairo-devel glib2-devel python3 python3-pyqt6
+```
+
+### Install with install.sh
 
 ```bash
 git clone https://github.com/vrdq/crosshair-overlay.git
 cd crosshair-overlay
-make
+./install.sh
 ```
 
-Install to user bin directory (`~/.local/bin` and `~/.local/share`):
+The script checks dependencies, compiles `src/crosshair`, installs binaries to `~/.local/bin`, installs the desktop entry and icon, and verifies your PATH.
+
+### Manual Build
 
 ```bash
+make
 make install
 ```
 
-To install system-wide (`/usr/local`):
-
+To install system-wide to `/usr/local`:
 ```bash
-sudo make PREFIX=/usr/local install
+sudo make install
 ```
 
 To uninstall:
-
 ```bash
 make uninstall
 ```
 
----
-
 ## Usage
 
-### Command Line Interface
+### Command Line
 
 ```bash
 crosshair start    # Start overlay daemon in the background
 crosshair stop     # Terminate running overlay
 crosshair toggle   # Toggle crosshair on/off
-crosshair reload   # Send SIGUSR1 to reload configuration instantly
+crosshair reload   # Reload configuration from disk
 crosshair status   # Check daemon running state and PID
-crosshair --help   # Show CLI help
+crosshair --help   # Show options
 ```
 
-### Configuration GUI
-
-Launch the native configuration dialog:
+### Settings GUI
 
 ```bash
 crosshair-gui
 ```
 
-You can also launch **Screen Crosshair** from your application launcher (Spotlight, Rofi, Wofi, Walker, or KDE KRunner).
-
----
+You can also launch **Crosshair Overlay** from your application launcher (Rofi, Wofi, Walker, or KDE KRunner).
 
 ## Configuration
 
-Configuration is stored in plain text at:
-
-```
-~/.config/crosshair/config
-```
-
-Example configuration file:
+Settings are saved in plain text at `~/.config/crosshair/config`:
 
 ```ini
-# Crosshair Overlay Configuration
 shape = dot
 size = 6.0
 color = #00FF00
@@ -115,37 +94,33 @@ thickness = 2
 monitor = all
 ```
 
-### Configuration Keys
+### Options
 
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `shape` | string | `dot` | Reticle shape: `dot`, `ring`, `dot-ring`, `cross`, `cross-dot` |
-| `size` | float | `6.0` | Outer size / diameter in pixels |
-| `color` | hex | `#00FF00` | Hex reticle color |
-| `outline` | float | `1.0` | Outline border thickness in pixels (`0` to disable) |
-| `outline_color` | hex | `#000000` | Hex outline border color |
-| `opacity` | float | `1.0` | Reticle opacity (`0.0` to `1.0`) |
-| `offset_x` | int | `0` | Horizontal pixel offset from screen center |
-| `offset_y` | int | `0` | Vertical pixel offset from screen center |
-| `gap` | int | `3` | Center gap for crosshair bars |
-| `length` | int | `7` | Length of crosshair arms |
-| `thickness` | int | `2` | Stroke thickness for crosshair arms/ring |
-| `monitor` | string | `all` | Display target (`all` or specific monitor name) |
+- `shape`: `dot`, `ring`, `dot-ring`, `cross`, or `cross-dot`
+- `size`: diameter or bounding size in pixels (default `6.0`)
+- `color`: hex color code (default `#00FF00`)
+- `outline`: border stroke thickness in pixels (default `1.0`, `0` to disable)
+- `outline_color`: border hex color (default `#000000`)
+- `opacity`: opacity from `0.1` to `1.0` (default `1.0`)
+- `offset_x`: horizontal pixel offset from screen center
+- `offset_y`: vertical pixel offset from screen center
+- `gap`: center gap in pixels for cross reticles
+- `length`: arm length in pixels for cross reticles
+- `thickness`: stroke thickness for cross arms and hollow rings
+- `monitor`: `all` or a specific monitor identifier (e.g. `DP-1`)
 
----
-
-## Compositor Integration
+## Compositor Setup
 
 ### Hyprland
 
-Add a keybinding to `~/.config/hypr/hyprland.conf`:
+Add to `~/.config/hypr/hyprland.conf`:
 
 ```ini
-# Toggle crosshair on/off with Super + Alt + C
+# Toggle crosshair with Super + Alt + C
 bind = $mainMod ALT, C, exec, crosshair toggle
 
-# Ensure configuration window floats
-windowrulev2 = float, class:^(crosshair-gui|CrosshairSettingsDialog)$, title:^(Crosshair Settings)$
+# Float configuration window
+windowrulev2 = float, class:^(crosshair-gui|CrosshairSettingsDialog)$
 ```
 
 ### Sway
@@ -156,8 +131,6 @@ Add to `~/.config/sway/config`:
 bindsym $mod+Mod1+c exec crosshair toggle
 for_window [app_id="crosshair-gui"] floating enable
 ```
-
----
 
 ## License
 
