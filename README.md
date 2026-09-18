@@ -120,7 +120,7 @@ Add to `~/.config/hypr/hyprland.conf`:
 bind = $mainMod ALT, C, exec, crosshair toggle
 
 # Float configuration window
-windowrulev2 = float, class:^(crosshair-gui|CrosshairSettingsDialog)$
+windowrulev2 = float, class:^(crosshair|crosshair-gui|CrosshairSettingsDialog)$
 ```
 
 ### Sway

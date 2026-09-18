@@ -236,32 +236,43 @@ static char *get_pid_file_path(void) {
     return g_strdup_printf("/tmp/crosshair-%d.pid", getuid());
 }
 
+static void write_pid_to_file(pid_t pid) {
+    char *path = get_pid_file_path();
+    FILE *f = fopen(path, "w");
+    if (f) {
+        fprintf(f, "%d\n", pid);
+        fclose(f);
+    }
+    g_free(path);
+}
+
 static pid_t get_running_pid(void) {
     char *path = get_pid_file_path();
     FILE *f = fopen(path, "r");
-    g_free(path);
-    if (!f) return -1;
+    if (!f) {
+        g_free(path);
+        return -1;
+    }
 
     pid_t pid = -1;
     if (fscanf(f, "%d", &pid) == 1) {
         fclose(f);
         if (pid > 0 && kill(pid, 0) == 0) {
+            g_free(path);
             return pid;
         }
+        // Stale PID file: process has died
+        unlink(path);
     } else {
         fclose(f);
+        unlink(path);
     }
+    g_free(path);
     return -1;
 }
 
 static void save_pid_file(void) {
-    char *path = get_pid_file_path();
-    FILE *f = fopen(path, "w");
-    if (f) {
-        fprintf(f, "%d\n", getpid());
-        fclose(f);
-    }
-    g_free(path);
+    write_pid_to_file(getpid());
 }
 
 static void remove_pid_file(void) {
@@ -702,6 +713,7 @@ int main(int argc, char **argv) {
             return 1;
         }
         if (child > 0) {
+            write_pid_to_file(child);
             printf("Crosshair turned ON (PID %d)\n", child);
             return 0;
         }
