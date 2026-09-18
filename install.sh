@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
-# crosshair-overlay installer
-# Installs crosshair daemon and crosshair-gui configuration utility.
+# cairo installer
+# Installs cairo daemon and cairo-gui configuration utility.
 
 BOLD='\033[1m'
 GREEN='\033[0;32m'
@@ -14,7 +14,7 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-echo -e "${BOLD}crosshair-overlay installer${NC}\n"
+echo -e "${BOLD}cairo installer${NC}\n"
 
 # 1. Dependency checks
 MISSING_PKGS=()
@@ -102,8 +102,8 @@ if [ ${#MISSING_PKGS[@]} -gt 0 ]; then
     fi
 fi
 
-# 2. Build crosshair binary
-echo -e "${BLUE}==>${NC} Building crosshair overlay daemon..."
+# 2. Build cairo binary
+echo -e "${BLUE}==>${NC} Building cairo overlay daemon..."
 make -C src clean
 make -C src
 
@@ -120,8 +120,12 @@ DESKTOPDIR="$DATADIR/applications"
 ICONDIR="$DATADIR/icons/hicolor/scalable/apps"
 
 echo -e "${BLUE}==>${NC} Installing to $PREFIX..."
-install -Dm755 src/crosshair "$BINDIR/crosshair"
-install -Dm755 crosshair-gui "$BINDIR/crosshair-gui"
+install -Dm755 src/cairo "$BINDIR/cairo"
+ln -sf cairo "$BINDIR/crosshair"
+install -Dm755 cairo-gui "$BINDIR/cairo-gui"
+ln -sf cairo-gui "$BINDIR/crosshair-gui"
+install -Dm644 data/cairo.desktop "$DESKTOPDIR/cairo.desktop"
+install -Dm644 data/cairo.svg "$ICONDIR/cairo.svg"
 install -Dm644 data/crosshair.desktop "$DESKTOPDIR/crosshair.desktop"
 install -Dm644 data/crosshair.svg "$ICONDIR/crosshair.svg"
 
@@ -145,7 +149,7 @@ done
 
 if [ "$PATH_OK" = false ]; then
     echo -e "\n${YELLOW}Notice: $BINDIR is not currently in your \$PATH.${NC}"
-    echo "To run 'crosshair' and 'crosshair-gui' directly, add it to your shell config:"
+    echo "To run 'cairo' and 'cairo-gui' directly, add it to your shell config:"
     echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc"
     echo "  # or for zsh:"
     echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc"
@@ -155,10 +159,12 @@ fi
 
 echo -e "\n${GREEN}${BOLD}Installation complete!${NC}"
 echo "Installed binaries:"
-echo "  $BINDIR/crosshair"
-echo "  $BINDIR/crosshair-gui"
+echo "  $BINDIR/cairo"
+echo "  $BINDIR/cairo-gui"
+echo "  $BINDIR/crosshair (symlink)"
+echo "  $BINDIR/crosshair-gui (symlink)"
 echo ""
 echo "Quick start:"
-echo "  crosshair start    # Start overlay in background"
-echo "  crosshair-gui      # Open configuration dialog"
-echo "  crosshair toggle   # Toggle on/off"
+echo "  cairo start    # Start overlay in background"
+echo "  cairo-gui      # Open configuration dialog"
+echo "  cairo toggle   # Toggle on/off"

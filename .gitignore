@@ -1,9 +1,11 @@
-# Binaries & build artifacts
+# Binaries and build artifacts
+cairo
 crosshair
+src/cairo
 src/crosshair
 *.o
 
-# Python bytecode & cache
+# Python bytecode and cache
 __pycache__/
 *.py[cod]
 

@@ -1,0 +1,24 @@
+[Desktop Entry]
+Name=Cairo
+GenericName=Crosshair and Reticle Overlay
+Comment=Screen reticle and crosshair overlay utility for Wayland
+Exec=cairo-gui
+Icon=cairo
+Terminal=false
+Type=Application
+Categories=Game;Utility;
+Keywords=cairo;crosshair;overlay;cs2;reticle;aim;fps;wayland;
+StartupNotify=true
+Actions=Toggle;Start;Stop;
+
+[Desktop Action Toggle]
+Name=Toggle Reticle
+Exec=cairo toggle
+
+[Desktop Action Start]
+Name=Enable Reticle
+Exec=cairo start
+
+[Desktop Action Stop]
+Name=Disable Reticle
+Exec=cairo stop

@@ -120,14 +120,32 @@ static void init_default_config(CrosshairConfig *cfg) {
 
 static char *get_default_config_path(void) {
     const char *xdg_config = getenv("XDG_CONFIG_HOME");
+    char *cairo_path = NULL;
+    char *legacy_path = NULL;
+
     if (xdg_config && *xdg_config) {
-        return g_strdup_printf("%s/crosshair/config", xdg_config);
+        cairo_path = g_strdup_printf("%s/cairo/config", xdg_config);
+        legacy_path = g_strdup_printf("%s/crosshair/config", xdg_config);
+    } else {
+        const char *home = getenv("HOME");
+        if (home && *home) {
+            cairo_path = g_strdup_printf("%s/.config/cairo/config", home);
+            legacy_path = g_strdup_printf("%s/.config/crosshair/config", home);
+        }
     }
-    const char *home = getenv("HOME");
-    if (home && *home) {
-        return g_strdup_printf("%s/.config/crosshair/config", home);
+
+    if (cairo_path && g_file_test(cairo_path, G_FILE_TEST_EXISTS)) {
+        if (legacy_path) g_free(legacy_path);
+        return cairo_path;
     }
-    return g_strdup("/tmp/crosshair-config");
+    if (legacy_path && g_file_test(legacy_path, G_FILE_TEST_EXISTS)) {
+        if (cairo_path) g_free(cairo_path);
+        return legacy_path;
+    }
+    if (legacy_path) g_free(legacy_path);
+    if (cairo_path) return cairo_path;
+
+    return g_strdup("/tmp/cairo-config");
 }
 
 static void ensure_default_config_file(const char *path) {
@@ -143,7 +161,7 @@ static void ensure_default_config_file(const char *path) {
     if (!f) return;
 
     fprintf(f, "# ==========================================\n");
-    fprintf(f, "# Crosshair Overlay Configuration\n");
+    fprintf(f, "# Cairo Reticle Overlay Configuration\n");
     fprintf(f, "# ==========================================\n");
     fprintf(f, "# Shape: dot, ring, dot-ring, cross, cross-dot\n");
     fprintf(f, "shape = dot\n\n");
@@ -231,9 +249,9 @@ static void load_config_file(const char *path, CrosshairConfig *cfg) {
 static char *get_pid_file_path(void) {
     const char *runtime_dir = getenv("XDG_RUNTIME_DIR");
     if (runtime_dir && *runtime_dir) {
-        return g_strdup_printf("%s/crosshair.pid", runtime_dir);
+        return g_strdup_printf("%s/cairo.pid", runtime_dir);
     }
-    return g_strdup_printf("/tmp/crosshair-%d.pid", getuid());
+    return g_strdup_printf("/tmp/cairo-%d.pid", getuid());
 }
 
 static void write_pid_to_file(pid_t pid) {
@@ -249,25 +267,42 @@ static void write_pid_to_file(pid_t pid) {
 static pid_t get_running_pid(void) {
     char *path = get_pid_file_path();
     FILE *f = fopen(path, "r");
-    if (!f) {
-        g_free(path);
-        return -1;
-    }
-
-    pid_t pid = -1;
-    if (fscanf(f, "%d", &pid) == 1) {
-        fclose(f);
-        if (pid > 0 && kill(pid, 0) == 0) {
-            g_free(path);
-            return pid;
+    if (f) {
+        pid_t pid = -1;
+        if (fscanf(f, "%d", &pid) == 1) {
+            fclose(f);
+            if (pid > 0 && kill(pid, 0) == 0) {
+                g_free(path);
+                return pid;
+            }
+            unlink(path);
+        } else {
+            fclose(f);
         }
-        // Stale PID file: process has died
-        unlink(path);
-    } else {
-        fclose(f);
-        unlink(path);
     }
     g_free(path);
+
+    /* Legacy crosshair.pid check */
+    const char *runtime_dir = getenv("XDG_RUNTIME_DIR");
+    char *legacy_path = (runtime_dir && *runtime_dir)
+        ? g_strdup_printf("%s/crosshair.pid", runtime_dir)
+        : g_strdup_printf("/tmp/crosshair-%d.pid", getuid());
+    f = fopen(legacy_path, "r");
+    if (f) {
+        pid_t pid = -1;
+        if (fscanf(f, "%d", &pid) == 1) {
+            fclose(f);
+            if (pid > 0 && kill(pid, 0) == 0) {
+                g_free(legacy_path);
+                return pid;
+            }
+            unlink(legacy_path);
+        } else {
+            fclose(f);
+        }
+    }
+    g_free(legacy_path);
+
     return -1;
 }
 
@@ -463,7 +498,7 @@ static GtkWidget *create_crosshair_window(GdkMonitor *monitor) {
     gtk_layer_set_layer(GTK_WINDOW(win), GTK_LAYER_SHELL_LAYER_OVERLAY);
     gtk_layer_set_keyboard_mode(GTK_WINDOW(win), GTK_LAYER_SHELL_KEYBOARD_MODE_NONE);
     gtk_layer_set_exclusive_zone(GTK_WINDOW(win), -1);
-    gtk_layer_set_namespace(GTK_WINDOW(win), "crosshair");
+    gtk_layer_set_namespace(GTK_WINDOW(win), "cairo");
 
     if (monitor) {
         gtk_layer_set_monitor(GTK_WINDOW(win), monitor);
@@ -559,12 +594,12 @@ static gboolean on_sighup(gpointer user_data) { (void)user_data;
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [COMMAND] [OPTIONS]\n\n", prog);
-    printf("A lightweight, click-through screen crosshair overlay for Wayland/Hyprland.\n\n");
+    printf("cairo: lightweight, click-through screen reticle overlay for Wayland.\n\n");
     printf("Commands:\n");
-    printf("  start               Start the crosshair (default action)\n");
-    printf("  stop                Stop running crosshair instance\n");
-    printf("  toggle              Toggle crosshair on or off\n");
-    printf("  status              Check if crosshair is running\n");
+    printf("  start               Start the reticle overlay (default action)\n");
+    printf("  stop                Stop running cairo instance\n");
+    printf("  toggle              Toggle reticle overlay on or off\n");
+    printf("  status              Check if cairo is running\n");
     printf("  reload              Reload configuration file without restarting\n\n");
     printf("Options:\n");
     printf("  -s, --size <px>         Size / diameter in pixels (default: 6.0)\n");
@@ -598,10 +633,10 @@ int main(int argc, char **argv) {
     if (strcasecmp(action, "status") == 0) {
         pid_t pid = get_running_pid();
         if (pid > 0) {
-            printf("Crosshair is running (PID %d)\n", pid);
+            printf("cairo is running (PID %d)\n", pid);
             return 0;
         } else {
-            printf("Crosshair is not running\n");
+            printf("cairo is not running\n");
             return 1;
         }
     }
@@ -615,10 +650,10 @@ int main(int argc, char **argv) {
                 usleep(50000);
             }
             remove_pid_file();
-            printf("Crosshair stopped (PID %d)\n", pid);
+            printf("cairo stopped (PID %d)\n", pid);
             return 0;
         } else {
-            printf("Crosshair is not running\n");
+            printf("cairo is not running\n");
             return 0;
         }
     }
@@ -632,7 +667,7 @@ int main(int argc, char **argv) {
                 usleep(50000);
             }
             remove_pid_file();
-            printf("Crosshair turned OFF\n");
+            printf("cairo reticle turned OFF\n");
             return 0;
         }
         action = "start";
@@ -643,10 +678,10 @@ int main(int argc, char **argv) {
         if (pid > 0) {
             kill(pid, SIGUSR1);
             kill(pid, SIGHUP);
-            printf("Reload signal sent to crosshair (PID %d)\n", pid);
+            printf("Reload signal sent to cairo (PID %d)\n", pid);
             return 0;
         } else {
-            fprintf(stderr, "Crosshair is not running\n");
+            fprintf(stderr, "cairo is not running\n");
             return 1;
         }
     }
@@ -702,7 +737,7 @@ int main(int argc, char **argv) {
 
     pid_t existing_pid = get_running_pid();
     if (existing_pid > 0) {
-        fprintf(stderr, "Crosshair is already running (PID %d).\nUse 'crosshair toggle' or 'crosshair stop'.\n", existing_pid);
+        fprintf(stderr, "cairo is already running (PID %d).\nUse '%s toggle' or '%s stop'.\n", existing_pid, argv[0], argv[0]);
         return 1;
     }
 
@@ -714,7 +749,7 @@ int main(int argc, char **argv) {
         }
         if (child > 0) {
             write_pid_to_file(child);
-            printf("Crosshair turned ON (PID %d)\n", child);
+            printf("cairo reticle turned ON (PID %d)\n", child);
             return 0;
         }
 

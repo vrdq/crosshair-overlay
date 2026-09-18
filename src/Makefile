@@ -9,15 +9,17 @@ LIBS = $(shell $(PKG_CONFIG) --libs $(DEPS)) -lm
 PREFIX ?= $(HOME)/.local
 BINDIR ?= $(PREFIX)/bin
 
-all: crosshair
+all: cairo
 
-crosshair: main.c
+cairo: main.c
 	$(CC) $(CFLAGS) $< $(LIBS) -o $@
+	ln -sf cairo crosshair
 
-install: crosshair
-	install -Dm755 crosshair $(DESTDIR)$(BINDIR)/crosshair
+install: cairo
+	install -Dm755 cairo $(DESTDIR)$(BINDIR)/cairo
+	ln -sf cairo $(DESTDIR)$(BINDIR)/crosshair
 
 clean:
-	rm -f crosshair
+	rm -f cairo crosshair
 
 .PHONY: all install clean

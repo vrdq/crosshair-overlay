@@ -1,10 +1,16 @@
-# crosshair-overlay
+# cairo
 
-Screen crosshair overlay daemon for Wayland compositors (Hyprland, Sway, River) written in C using `gtk-layer-shell` and Cairo, with a native Qt settings utility (`crosshair-gui`).
+Screen reticle and crosshair overlay daemon for Wayland compositors (Hyprland, Sway, River) written in C using `gtk-layer-shell` and Cairo graphics, paired with a native Qt settings utility (`cairo-gui`).
+
+## Identity
+
+**cairo** is named after two things:
+1. The **Cairo 2D vector graphics library** (`libcairo`) used to render anti-aliased subpixel reticles.
+2. **Cairo, Egypt**, the developer's home city.
 
 ## How It Works
 
-Unlike X11 overlays or utilities running through XWayland, `crosshair-overlay` binds directly to the Wayland `overlay` layer surface with input passthrough enabled. Clicks and mouse motion pass straight through to the underlying game without added latency.
+Unlike X11 overlays or utilities running through XWayland, `cairo` binds directly to the Wayland `overlay` layer surface with input passthrough enabled. Clicks and mouse motion pass straight through to the underlying game with zero added latency.
 
 Reticles (dot, hollow ring, dot-ring, cross, and cross-dot) are drawn using Cairo with anti-aliasing. The daemon listens for `SIGUSR1` and `SIGHUP` signals, reloading configuration from disk without restarting the process.
 
@@ -12,12 +18,12 @@ Reticles (dot, hollow ring, dot-ring, cross, and cross-dot) are drawn using Cair
 
 ### Dependencies
 
-On Arch Linux / CachyOS / Manjaro:
+On Arch Linux, CachyOS, and Manjaro:
 ```bash
 sudo pacman -S base-devel gtk3 gtk-layer-shell cairo glib2 python python-pyqt6
 ```
 
-On Debian / Ubuntu / Linux Mint:
+On Debian, Ubuntu, and Linux Mint:
 ```bash
 sudo apt-get update && sudo apt-get install -y build-essential libgtk-3-dev libgtk-layer-shell-dev libcairo2-dev libglib2.0-dev pkg-config python3 python3-pyqt6
 ```
@@ -35,7 +41,7 @@ cd crosshair-overlay
 ./install.sh
 ```
 
-The script checks dependencies, compiles `src/crosshair`, installs binaries to `~/.local/bin`, installs the desktop entry and icon, and verifies your PATH.
+The script checks dependencies, compiles `src/cairo`, installs binaries to `~/.local/bin`, installs the desktop entry and icon, and verifies your PATH.
 
 ### Manual Build
 
@@ -59,25 +65,27 @@ make uninstall
 ### Command Line
 
 ```bash
-crosshair start    # Start overlay daemon in the background
-crosshair stop     # Terminate running overlay
-crosshair toggle   # Toggle crosshair on/off
-crosshair reload   # Reload configuration from disk
-crosshair status   # Check daemon running state and PID
-crosshair --help   # Show options
+cairo start    # Start overlay daemon in the background
+cairo stop     # Terminate running overlay
+cairo toggle   # Toggle reticle on or off
+cairo reload   # Reload configuration from disk
+cairo status   # Check daemon running state and PID
+cairo --help   # Show options
 ```
+
+*Note: `crosshair` is maintained as a symlink to `cairo` for backwards compatibility with existing keybinds.*
 
 ### Settings GUI
 
 ```bash
-crosshair-gui
+cairo-gui
 ```
 
-You can also launch **Crosshair Overlay** from your application launcher (Rofi, Wofi, Walker, or KDE KRunner).
+You can also launch **Cairo** from your application launcher (Rofi, Wofi, Walker, or KDE KRunner).
 
 ## Configuration
 
-Settings are saved in plain text at `~/.config/crosshair/config`:
+Settings are saved in plain text at `~/.config/cairo/config` (with automatic fallback to `~/.config/crosshair/config` if present):
 
 ```ini
 shape = dot
@@ -107,7 +115,7 @@ monitor = all
 - `gap`: center gap in pixels for cross reticles
 - `length`: arm length in pixels for cross reticles
 - `thickness`: stroke thickness for cross arms and hollow rings
-- `monitor`: `all` or a specific monitor identifier (e.g. `DP-1`)
+- `monitor`: `all` or a specific monitor identifier (such as `DP-1`)
 
 ## Compositor Setup
 
@@ -116,11 +124,11 @@ monitor = all
 Add to `~/.config/hypr/hyprland.conf`:
 
 ```ini
-# Toggle crosshair with Super + Alt + C
-bind = $mainMod ALT, C, exec, crosshair toggle
+# Toggle reticle with Super + Alt + C
+bind = $mainMod ALT, C, exec, cairo toggle
 
 # Float configuration window
-windowrulev2 = float, class:^(crosshair|crosshair-gui|CrosshairSettingsDialog)$
+windowrulev2 = float, class:^(cairo|cairo-gui|crosshair|crosshair-gui|CrosshairSettingsDialog)$
 ```
 
 ### Sway
@@ -128,8 +136,8 @@ windowrulev2 = float, class:^(crosshair|crosshair-gui|CrosshairSettingsDialog)$
 Add to `~/.config/sway/config`:
 
 ```ini
-bindsym $mod+Mod1+c exec crosshair toggle
-for_window [app_id="crosshair-gui"] floating enable
+bindsym $mod+Mod1+c exec cairo toggle
+for_window [app_id="cairo-gui"] floating enable
 ```
 
 ## License

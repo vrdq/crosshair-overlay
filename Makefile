@@ -13,18 +13,26 @@ all:
 	$(MAKE) -C src
 
 install: all
-	install -Dm755 src/crosshair $(DESTDIR)$(BINDIR)/crosshair
-	install -Dm755 crosshair-gui $(DESTDIR)$(BINDIR)/crosshair-gui
+	install -Dm755 src/cairo $(DESTDIR)$(BINDIR)/cairo
+	ln -sf cairo $(DESTDIR)$(BINDIR)/crosshair
+	install -Dm755 cairo-gui $(DESTDIR)$(BINDIR)/cairo-gui
+	ln -sf cairo-gui $(DESTDIR)$(BINDIR)/crosshair-gui
+	install -Dm644 data/cairo.desktop $(DESTDIR)$(DESKTOPDIR)/cairo.desktop
+	install -Dm644 data/cairo.svg $(DESTDIR)$(ICONDIR)/cairo.svg
 	install -Dm644 data/crosshair.desktop $(DESTDIR)$(DESKTOPDIR)/crosshair.desktop
 	install -Dm644 data/crosshair.svg $(DESTDIR)$(ICONDIR)/crosshair.svg
 	@command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database $(DESTDIR)$(DESKTOPDIR) || true
 	@command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -f -t $(DESTDIR)$(DATADIR)/icons/hicolor 2>/dev/null || true
-	@echo "Installed crosshair and crosshair-gui to $(DESTDIR)$(BINDIR)"
+	@echo "Installed cairo and cairo-gui to $(DESTDIR)$(BINDIR)"
 
 uninstall:
+	rm -f $(DESTDIR)$(BINDIR)/cairo
 	rm -f $(DESTDIR)$(BINDIR)/crosshair
+	rm -f $(DESTDIR)$(BINDIR)/cairo-gui
 	rm -f $(DESTDIR)$(BINDIR)/crosshair-gui
+	rm -f $(DESTDIR)$(DESKTOPDIR)/cairo.desktop
 	rm -f $(DESTDIR)$(DESKTOPDIR)/crosshair.desktop
+	rm -f $(DESTDIR)$(ICONDIR)/cairo.svg
 	rm -f $(DESTDIR)$(ICONDIR)/crosshair.svg
 	@command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database $(DESTDIR)$(DESKTOPDIR) || true
 	@command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -f -t $(DESTDIR)$(DATADIR)/icons/hicolor 2>/dev/null || true
