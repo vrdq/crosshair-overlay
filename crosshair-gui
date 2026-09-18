@@ -15,7 +15,7 @@ from PyQt6.QtGui import (
     QBrush, QColor, QFont, QGuiApplication, QIcon, QPainter, QPen
 )
 from PyQt6.QtWidgets import (
-    QApplication, QColorDialog, QComboBox, QDialog, QDoubleSpinBox,
+    QApplication, QComboBox, QDialog, QDoubleSpinBox,
     QFormLayout, QFrame, QGridLayout, QHBoxLayout, QLabel,
     QLineEdit, QPushButton, QSlider, QSpinBox, QTabWidget,
     QVBoxLayout, QWidget
@@ -304,7 +304,7 @@ class CrosshairSettingsDialog(QDialog):
             QPushButton:pressed {
                 background-color: #161616;
             }
-            QComboBox, QSpinBox, QDoubleSpinBox {
+            QComboBox, QSpinBox, QDoubleSpinBox, QLineEdit {
                 background-color: #1a1a1a;
                 color: #d4d4d4;
                 border: 1px solid #2a2a2a;
@@ -312,7 +312,7 @@ class CrosshairSettingsDialog(QDialog):
                 border-radius: 2px;
                 font-size: 12px;
             }
-            QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
+            QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QLineEdit:focus {
                 border-color: #444444;
             }
             QComboBox QAbstractItemView {
@@ -492,12 +492,10 @@ class CrosshairSettingsDialog(QDialog):
         form_style.setVerticalSpacing(8)
 
         form_style.addWidget(QLabel("Color"), 0, 0)
-        color_row = QHBoxLayout()
-        self.btn_color = QPushButton("#3DDBD9")
-        self.btn_color.clicked.connect(self.choose_color)
-        color_row.addWidget(self.btn_color)
-        color_row.addStretch()
-        form_style.addLayout(color_row, 0, 1)
+        self.edit_color = QLineEdit(self.cfg.get("color", "#3DDBD9"))
+        self.edit_color.setFixedWidth(86)
+        self.edit_color.textEdited.connect(self.on_color_edited)
+        form_style.addWidget(self.edit_color, 0, 1, Qt.AlignmentFlag.AlignLeft)
 
         form_style.addWidget(QLabel("Outline"), 1, 0)
         outline_box = QHBoxLayout()
@@ -515,12 +513,10 @@ class CrosshairSettingsDialog(QDialog):
         form_style.addLayout(outline_box, 1, 1)
 
         form_style.addWidget(QLabel("Outline Color"), 2, 0)
-        out_row = QHBoxLayout()
-        self.btn_out_color = QPushButton("#000000")
-        self.btn_out_color.clicked.connect(self.choose_outline_color)
-        out_row.addWidget(self.btn_out_color)
-        out_row.addStretch()
-        form_style.addLayout(out_row, 2, 1)
+        self.edit_out_color = QLineEdit(self.cfg.get("outline_color", "#000000"))
+        self.edit_out_color.setFixedWidth(86)
+        self.edit_out_color.textEdited.connect(self.on_outline_color_edited)
+        form_style.addWidget(self.edit_out_color, 2, 1, Qt.AlignmentFlag.AlignLeft)
 
         form_style.addWidget(QLabel("Opacity"), 3, 0)
         opacity_box = QHBoxLayout()
@@ -642,7 +638,8 @@ class CrosshairSettingsDialog(QDialog):
         if m_idx >= 0:
             self.combo_monitor.setCurrentIndex(m_idx)
 
-        self.update_color_buttons()
+        self.edit_color.setText(self.cfg.get("color", "#3DDBD9").upper())
+        self.edit_out_color.setText(self.cfg.get("outline_color", "#000000").upper())
         self.update_shape_visibility(shape)
         self.canvas.set_config(self.cfg)
         self.updating_ui = False
@@ -663,14 +660,17 @@ class CrosshairSettingsDialog(QDialog):
         self.spin_thick.setEnabled(is_cross or is_ring)
         self.thickness_label.setEnabled(is_cross or is_ring)
 
-    def update_color_buttons(self):
-        col = self.cfg.get("color", "#3DDBD9").upper()
-        self.btn_color.setText(col)
-        self.btn_color.setStyleSheet(f"background-color: #1e1e1e; color: {col}; border: 1px solid #333333; font-weight: 600; padding: 4px 10px;")
+    def on_color_edited(self, text):
+        text = text.strip()
+        if QColor.isValidColorName(text):
+            self.cfg["color"] = text.upper()
+            self.commit()
 
-        out_col = self.cfg.get("outline_color", "#000000").upper()
-        self.btn_out_color.setText(out_col)
-        self.btn_out_color.setStyleSheet(f"background-color: #1e1e1e; color: {'#aaaaaa' if out_col == '#000000' else out_col}; border: 1px solid #333333; padding: 4px 10px;")
+    def on_outline_color_edited(self, text):
+        text = text.strip()
+        if QColor.isValidColorName(text):
+            self.cfg["outline_color"] = text.upper()
+            self.commit()
 
     def on_shape_changed(self, idx):
         if self.updating_ui: return
@@ -825,21 +825,6 @@ class CrosshairSettingsDialog(QDialog):
         self.updating_ui = False
         self.commit()
 
-    def choose_color(self):
-        cur = QColor(self.cfg.get("color", "#3DDBD9"))
-        col = QColorDialog.getColor(cur, self, "Reticle Color")
-        if col.isValid():
-            self.cfg["color"] = col.name().upper()
-            self.update_color_buttons()
-            self.commit()
-
-    def choose_outline_color(self):
-        cur = QColor(self.cfg.get("outline_color", "#000000"))
-        col = QColorDialog.getColor(cur, self, "Outline Color")
-        if col.isValid():
-            self.cfg["outline_color"] = col.name().upper()
-            self.update_color_buttons()
-            self.commit()
 
     def commit(self):
         self.canvas.set_config(self.cfg)
