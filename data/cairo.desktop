@@ -1,5 +1,5 @@
 [Desktop Entry]
-Name=Cairo
+Name=Cairo Crosshair App
 GenericName=Crosshair and Reticle Overlay
 Comment=Screen reticle and crosshair overlay utility for Wayland
 Exec=cairo-gui

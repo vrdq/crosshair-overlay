@@ -161,7 +161,7 @@ static void ensure_default_config_file(const char *path) {
     if (!f) return;
 
     fprintf(f, "# ==========================================\n");
-    fprintf(f, "# Cairo Reticle Overlay Configuration\n");
+    fprintf(f, "# Cairo Crosshair App Configuration\n");
     fprintf(f, "# ==========================================\n");
     fprintf(f, "# Shape: dot, ring, dot-ring, cross, cross-dot\n");
     fprintf(f, "shape = dot\n\n");
@@ -594,7 +594,7 @@ static gboolean on_sighup(gpointer user_data) { (void)user_data;
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [COMMAND] [OPTIONS]\n\n", prog);
-    printf("cairo: lightweight, click-through screen reticle overlay for Wayland.\n\n");
+    printf("Cairo Crosshair App: lightweight, click-through screen reticle overlay for Wayland.\n\n");
     printf("Commands:\n");
     printf("  start               Start the reticle overlay (default action)\n");
     printf("  stop                Stop running cairo instance\n");

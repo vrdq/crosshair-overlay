@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# cairo installer
+# Cairo Crosshair App installer
 # Installs cairo daemon and cairo-gui configuration utility.
 
 BOLD='\033[1m'
@@ -14,7 +14,7 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-echo -e "${BOLD}cairo installer${NC}\n"
+echo -e "${BOLD}Cairo Crosshair App installer${NC}\n"
 
 # 1. Dependency checks
 MISSING_PKGS=()

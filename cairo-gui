@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-cairo-gui: configuration utility for Wayland cairo reticle overlay daemon.
+cairo-gui: configuration utility for Cairo Crosshair App (Wayland reticle overlay daemon).
 Controls reticle geometry, color, opacity, offsets, and monitor targeting.
 """
 
@@ -270,7 +270,7 @@ class PreviewWidget(QFrame):
 class CrosshairSettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("cairo")
+        self.setWindowTitle("Cairo Crosshair App")
         self.setFixedSize(515, 245)
 
         icon_candidates = [

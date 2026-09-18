@@ -1,10 +1,10 @@
-# cairo
+# Cairo Crosshair App
 
 Screen reticle and crosshair overlay daemon for Wayland compositors (Hyprland, Sway, River) written in C using `gtk-layer-shell` and Cairo graphics, paired with a native Qt settings utility (`cairo-gui`).
 
 ## Identity
 
-**cairo** is named after two things:
+**Cairo Crosshair App** is named after two things:
 1. The **Cairo 2D vector graphics library** (`libcairo`) used to render anti-aliased subpixel reticles.
 2. **Cairo, Egypt**, the developer's home city.
 
@@ -81,7 +81,7 @@ cairo --help   # Show options
 cairo-gui
 ```
 
-You can also launch **Cairo** from your application launcher (Rofi, Wofi, Walker, or KDE KRunner).
+You can also launch **Cairo Crosshair App** from your application launcher (Rofi, Wofi, Walker, or KDE KRunner).
 
 ## Configuration
 
